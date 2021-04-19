@@ -82,6 +82,7 @@ pub fn mount_points() -> Result<Vec<PathBuf>, Error> {
         let p: &statfs64 = unsafe { &*mntbuf };
         let mount_point = unsafe { CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char) };
         mount_points.push(mount_point.to_str().map_err(|_| Error::Utf8Error)?.into());
+        mntbuf = unsafe { mntbuf.add(1) };
         n -= 1;
     }
 
