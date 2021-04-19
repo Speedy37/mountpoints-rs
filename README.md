@@ -1,4 +1,4 @@
-# mountpoints - List mount points (windows, linux, ...)
+# mountpoints - List mount points (windows, linux, macos)
 
 ## Example
 
@@ -12,7 +12,7 @@ fn main() {
 }
 ```
 
-__Windows output:__
+**Windows output:**
 
 ```
 C:\
@@ -20,7 +20,7 @@ C:\MyLittleMountPoint
 D:\
 ```
 
-__Linux output:__
+**Linux output:**
 
 ```
 /mnt/wsl
@@ -36,4 +36,15 @@ __Linux output:__
 /sys/fs/cgroup/unified
 /mnt/c
 /mnt/d
+```
+
+**Macos output:**
+
+```
+/
+/dev
+/System/Volumes/Data
+/private/var/vm
+/System/Volumes/Data/home
+/Volumes/VMware Shared Folders
 ```
