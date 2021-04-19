@@ -8,7 +8,9 @@ edition = "2018"
 description = """
 List mount points (windows, linux, ...)
 """
-[dependencies]
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(target_os  = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["errhandlingapi", "handleapi", "fileapi", "winerror"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = { version = "0.2.93" }
