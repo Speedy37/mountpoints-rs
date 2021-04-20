@@ -22,7 +22,7 @@ impl fmt::Display for Error {
     }
 }
 
-fn _mounts(mut cb: impl FnMut(String) -> Result<(), Error>) -> Result<(), Error> {
+fn _mounts(mut cb: impl FnMut(String, Option<&str>) -> Result<(), Error>) -> Result<(), Error> {
     let mounts = fs::read_to_string("/proc/mounts").map_err(|err| Error::IoError(err))?;
     for mount in mounts.split('\n') {
         if mount.starts_with('#') {
@@ -31,7 +31,11 @@ fn _mounts(mut cb: impl FnMut(String) -> Result<(), Error>) -> Result<(), Error>
         let mut it = mount.split(&[' ', '\t'][..]);
         let _fs = it.next();
         if let Some(mountpath) = it.next() {
-            cb(mountpath.replace("\\040", " ").replace("\\011", "\t"))?;
+            let fstype = it.next();
+            cb(
+                mountpath.replace("\\040", " ").replace("\\011", "\t"),
+                fstype,
+            )?;
         }
     }
     Ok(())
@@ -39,7 +43,7 @@ fn _mounts(mut cb: impl FnMut(String) -> Result<(), Error>) -> Result<(), Error>
 
 pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
     let mut mountinfos = Vec::new();
-    _mounts(|path| {
+    _mounts(|path, fstype| {
         let cpath = CString::new(path.as_str()).map_err(|_| Error::NulError)?;
         let mut stat = MaybeUninit::<libc::statvfs>::zeroed();
         let r = unsafe { libc::statvfs(cpath.as_ptr(), stat.as_mut_ptr()) };
@@ -53,7 +57,7 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
             free: Some(stat.f_bfree.saturating_mul(u64::from(stat.f_bsize))),
             size: Some(stat.f_blocks.saturating_mul(u64::from(stat.f_frsize))),
             name: None,
-            format: None,
+            format: fstype.map(|s| s.to_string()),
             readonly: Some((stat.f_flag & libc::ST_RDONLY) == libc::ST_RDONLY),
             __priv: (),
         });
@@ -64,7 +68,7 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
 
 pub fn mountpaths() -> Result<Vec<String>, Error> {
     let mut mountpaths = Vec::new();
-    _mounts(|mountpath| {
+    _mounts(|mountpath, _| {
         mountpaths.push(mountpath);
         Ok(())
     })?;
