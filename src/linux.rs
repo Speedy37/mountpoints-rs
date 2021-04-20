@@ -15,7 +15,7 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
+pub fn mountpaths() -> Result<Vec<String>, Error> {
     let mounts = fs::read_to_string("/proc/mounts").map_err(|err| Error::IoError(err))?;
     let mut mountpaths = Vec::new();
     for mount in mounts.split('\n') {
@@ -25,12 +25,7 @@ pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
         let mut it = mount.split(&[' ', '\t'][..]);
         let fs = it.next();
         if let Some(mountpath) = it.next() {
-            mountpaths.push(
-                mountpath
-                    .replace("\\040", " ")
-                    .replace("\\011", "\t")
-                    .into(),
-            );
+            mountpaths.push(mountpath.replace("\\040", " ").replace("\\011", "\t"));
         }
     }
     Ok(mountpaths)

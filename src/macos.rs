@@ -70,7 +70,7 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
+pub fn mountpaths() -> Result<Vec<String>, Error> {
     let mut mntbuf: *const statfs64 = std::ptr::null_mut();
     let mut n = unsafe { getmntinfo64(&mut mntbuf, MNT_NOWAIT) };
     if n <= 0 {
@@ -81,7 +81,7 @@ pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
     while n > 0 {
         let p: &statfs64 = unsafe { &*mntbuf };
         let mountpath = unsafe { CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char) };
-        mountpaths.push(mountpath.to_str().map_err(|_| Error::Utf8Error)?.into());
+        mountpaths.push(mountpath.to_str().map_err(|_| Error::Utf8Error)?);
         mntbuf = unsafe { mntbuf.add(1) };
         n -= 1;
     }

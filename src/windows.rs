@@ -21,7 +21,7 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
+pub fn mountpaths() -> Result<Vec<String>, Error> {
     use winapi::shared::winerror::{ERROR_MORE_DATA, ERROR_NO_MORE_FILES};
     use winapi::um::errhandlingapi::GetLastError;
     use winapi::um::fileapi::GetVolumePathNamesForVolumeNameW;
@@ -66,7 +66,7 @@ pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
 
         for mount_pointw in slice.split(|&c| c == 0).take_while(|s| !s.is_empty()) {
             let mountpath = String::from_utf16(mount_pointw).map_err(|_| Error::Utf16Error)?;
-            mountpaths.push(mountpath.into());
+            mountpaths.push(mountpath);
         }
 
         let more = unsafe { FindNextVolumeW(handle, name.as_mut_ptr(), name.len() as u32) };
