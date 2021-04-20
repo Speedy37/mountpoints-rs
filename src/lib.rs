@@ -28,6 +28,8 @@ pub struct MountInfo {
     pub format: Option<String>,
     /// Read only
     pub readonly: Option<bool>,
+    /// True if this mount point is likely to not be important
+    pub dummy: bool,
     __priv: (),
 }
 

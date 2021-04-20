@@ -96,6 +96,7 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
             name: None,
             format: None,
             readonly: None,
+            dummy: true,
             __priv: (),
         };
         // sizes
@@ -115,6 +116,7 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
                 info.avail = Some(unsafe { *lpFreeBytesAvailableToCaller.QuadPart() });
                 info.free = Some(unsafe { *lpTotalNumberOfFreeBytes.QuadPart() });
                 info.size = Some(unsafe { *lpTotalNumberOfBytes.QuadPart() });
+                info.dummy = false;
             }
         }
         // name
@@ -143,6 +145,7 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
                     info.format = Some(String::from_utf16(slice).map_err(|_| Error::Utf16Error)?);
                 }
                 info.readonly = Some((flags & FILE_READ_ONLY_VOLUME) == FILE_READ_ONLY_VOLUME);
+                info.dummy = false;
             }
         }
 
