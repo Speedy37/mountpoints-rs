@@ -21,14 +21,14 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn mount_points() -> Result<Vec<PathBuf>, Error> {
+pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
     use winapi::shared::winerror::{ERROR_MORE_DATA, ERROR_NO_MORE_FILES};
     use winapi::um::errhandlingapi::GetLastError;
     use winapi::um::fileapi::GetVolumePathNamesForVolumeNameW;
     use winapi::um::fileapi::{FindFirstVolumeW, FindNextVolumeW, FindVolumeClose};
     use winapi::um::handleapi::INVALID_HANDLE_VALUE;
 
-    let mut mount_points = Vec::new();
+    let mut mountpaths = Vec::new();
     const MAX_PATH: usize = 32768;
     let mut name = [0u16; MAX_PATH];
     let handle = unsafe { FindFirstVolumeW(name.as_mut_ptr(), name.len() as u32) };
@@ -65,8 +65,8 @@ pub fn mount_points() -> Result<Vec<PathBuf>, Error> {
         }
 
         for mount_pointw in slice.split(|&c| c == 0).take_while(|s| !s.is_empty()) {
-            let mount_point = String::from_utf16(mount_pointw).map_err(|_| Error::Utf16Error)?;
-            mount_points.push(mount_point.into());
+            let mountpath = String::from_utf16(mount_pointw).map_err(|_| Error::Utf16Error)?;
+            mountpaths.push(mountpath.into());
         }
 
         let more = unsafe { FindNextVolumeW(handle, name.as_mut_ptr(), name.len() as u32) };
@@ -83,5 +83,5 @@ pub fn mount_points() -> Result<Vec<PathBuf>, Error> {
         return Err(Error::VolumeIterError(unsafe { GetLastError() }));
     }
 
-    Ok(mount_points)
+    Ok(mountpaths)
 }

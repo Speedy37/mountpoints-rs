@@ -15,23 +15,23 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn mount_points() -> Result<Vec<PathBuf>, Error> {
+pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
     let mounts = fs::read_to_string("/proc/mounts").map_err(|err| Error::IoError(err))?;
-    let mut mount_points = Vec::new();
+    let mut mountpaths = Vec::new();
     for mount in mounts.split('\n') {
         if mount.starts_with('#') {
             continue;
         }
         let mut it = mount.split(&[' ', '\t'][..]);
         let fs = it.next();
-        if let Some(mount_point) = it.next() {
-            mount_points.push(
-                mount_point
+        if let Some(mountpath) = it.next() {
+            mountpaths.push(
+                mountpath
                     .replace("\\040", " ")
                     .replace("\\011", "\t")
                     .into(),
             );
         }
     }
-    Ok(mount_points)
+    Ok(mountpaths)
 }

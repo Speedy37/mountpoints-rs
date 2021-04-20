@@ -6,11 +6,11 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "linux")]
-pub use linux::{mount_points, Error};
+pub use linux::{mountpaths, Error};
 #[cfg(target_os = "macos")]
-pub use macos::{mount_points, Error};
+pub use macos::{mountpaths, Error};
 #[cfg(target_os = "windows")]
-pub use windows::{mount_points, Error};
+pub use windows::{mountpaths, Error};
 
 impl std::error::Error for Error {}
 
@@ -20,8 +20,8 @@ mod tests {
 
     #[test]
     fn it_works() {
-        for mount_point in mount_points().unwrap() {
-            eprintln!("{}", mount_point.display());
+        for mountpath in mountpaths().unwrap() {
+            eprintln!("{}", mountpath.display());
         }
     }
 }
