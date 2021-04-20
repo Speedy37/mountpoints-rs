@@ -49,9 +49,12 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
         let stat = unsafe { stat.assume_init() };
         mountinfos.push(MountInfo {
             path,
-            avail: stat.f_bavail.saturating_mul(u64::from(stat.f_bsize)),
-            free: stat.f_bfree.saturating_mul(u64::from(stat.f_bsize)),
-            size: stat.f_blocks.saturating_mul(u64::from(stat.f_frsize)),
+            avail: Some(stat.f_bavail.saturating_mul(u64::from(stat.f_bsize))),
+            free: Some(stat.f_bfree.saturating_mul(u64::from(stat.f_bsize))),
+            size: Some(stat.f_blocks.saturating_mul(u64::from(stat.f_frsize))),
+            name: None,
+            format: None,
+            readonly: Some((stat.f_flag & libc::ST_RDONLY) == libc::ST_RDONLY),
             __priv: (),
         });
         Ok(())

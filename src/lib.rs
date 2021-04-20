@@ -17,11 +17,17 @@ pub struct MountInfo {
     /// Mount path
     pub path: String,
     /// Available bytes to current user
-    pub avail: u64,
+    pub avail: Option<u64>,
     /// Free bytes
-    pub free: u64,
+    pub free: Option<u64>,
     /// Size in bytes
-    pub size: u64,
+    pub size: Option<u64>,
+    /// Name
+    pub name: Option<String>,
+    /// Format (NTFS, FAT, ext4, ...)
+    pub format: Option<String>,
+    /// Read only
+    pub readonly: Option<bool>,
     __priv: (),
 }
 

@@ -14,6 +14,7 @@ struct fsid_t {
 const MFSTYPENAMELEN: usize = 16;
 const MAXPATHLEN: usize = 1024;
 const MNT_NOWAIT: c_int = 2;
+const MNT_RDONLY: u32 = 1;
 
 #[repr(C)]
 struct statfs64 {
@@ -93,9 +94,12 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
     _mounts(|stat, path| {
         mountinfos.push(MountInfo {
             path,
-            avail: stat.f_bavail.saturating_mul(u64::from(stat.f_bsize)),
-            free: stat.f_bfree.saturating_mul(u64::from(stat.f_bsize)),
-            size: stat.f_blocks.saturating_mul(u64::from(stat.f_bsize)),
+            avail: Some(stat.f_bavail.saturating_mul(u64::from(stat.f_bsize))),
+            free: Some(stat.f_bfree.saturating_mul(u64::from(stat.f_bsize))),
+            size: Some(stat.f_blocks.saturating_mul(u64::from(stat.f_bsize))),
+            name: None,
+            format: None,
+            readonly: Some((stat.f_flags & MNT_RDONLY) == MNT_RDONLY),
             __priv: (),
         });
         Ok(())
