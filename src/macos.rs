@@ -1,7 +1,7 @@
+use crate::MountInfo;
 use std::ffi::CStr;
 use std::fmt;
 use std::os::raw::{c_char, c_int};
-use std::path::PathBuf;
 
 #[allow(non_camel_case_types)]
 type uid_t = u32;
@@ -70,21 +70,44 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn mountpaths() -> Result<Vec<String>, Error> {
+fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result<(), Error> {
     let mut mntbuf: *const statfs64 = std::ptr::null_mut();
     let mut n = unsafe { getmntinfo64(&mut mntbuf, MNT_NOWAIT) };
     if n <= 0 {
         return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
     }
 
-    let mut mountpaths = Vec::with_capacity(n as usize);
     while n > 0 {
         let p: &statfs64 = unsafe { &*mntbuf };
         let mountpath = unsafe { CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char) };
-        mountpaths.push(mountpath.to_str().map_err(|_| Error::Utf8Error)?);
+        cb(p, mountpath.to_str().map_err(|_| Error::Utf8Error)?.into())?;
         mntbuf = unsafe { mntbuf.add(1) };
         n -= 1;
     }
 
+    Ok(())
+}
+
+pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
+    let mut mountinfos = Vec::new();
+    _mounts(|stat, path| {
+        mountinfos.push(MountInfo {
+            path,
+            avail: stat.f_bavail.saturating_mul(u64::from(stat.f_bsize)),
+            free: stat.f_bfree.saturating_mul(u64::from(stat.f_bsize)),
+            size: stat.f_blocks.saturating_mul(u64::from(stat.f_bsize)),
+            __priv: (),
+        });
+        Ok(())
+    })?;
+    Ok(mountinfos)
+}
+
+pub fn mountpaths() -> Result<Vec<String>, Error> {
+    let mut mountpaths = Vec::new();
+    _mounts(|_, mountpath| {
+        mountpaths.push(mountpath);
+        Ok(())
+    })?;
     Ok(mountpaths)
 }

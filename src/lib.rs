@@ -12,7 +12,20 @@ use macos as sys;
 #[cfg(target_os = "windows")]
 use windows as sys;
 
-pub use sys::{mountpaths, Error};
+#[derive(Debug, Clone)]
+pub struct MountInfo {
+    /// Mount path
+    pub path: String,
+    /// Available bytes to current user
+    pub avail: u64,
+    /// Free bytes
+    pub free: u64,
+    /// Size in bytes
+    pub size: u64,
+    __priv: (),
+}
+
+pub use sys::{mountinfos, mountpaths, Error};
 impl std::error::Error for Error {}
 
 #[cfg(test)]
@@ -20,9 +33,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
+    fn mountpaths_works() {
         for mountpath in mountpaths().unwrap() {
             eprintln!("{}", mountpath);
+        }
+    }
+    #[test]
+    fn mountinfosworks() {
+        for mountinfo in mountinfos().unwrap() {
+            eprintln!("{:?}", mountinfo);
         }
     }
 }

@@ -10,7 +10,13 @@ List mount points (windows, linux, ...)
 """
 
 [target.'cfg(target_os  = "windows")'.dependencies]
-winapi = { version = "0.3", features = ["errhandlingapi", "handleapi", "fileapi", "winerror"] }
+winapi = { version = "0.3", features = [
+    "errhandlingapi",
+    "handleapi",
+    "fileapi",
+    "winerror",
+    "impl-default",
+] }
 
-[target.'cfg(target_os = "macos")'.dependencies]
+[target.'cfg(not(target_os = "windows"))'.dependencies]
 libc = { version = "0.2.93" }
