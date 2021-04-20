@@ -3,11 +3,11 @@
 ## Example
 
 ```rust
-use mountpoints::mount_points;
+use mountpoints::mountpaths;
 
 fn main() {
-    for mount_point in mount_points().unwrap() {
-        println!("{}", mount_point.display());
+    for mountpath in mountpaths().unwrap() {
+        println!("{}", mountpath);
     }
 }
 ```

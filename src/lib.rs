@@ -6,12 +6,34 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "linux")]
-pub use linux::{mount_points, Error};
+use linux as sys;
 #[cfg(target_os = "macos")]
-pub use macos::{mount_points, Error};
+use macos as sys;
 #[cfg(target_os = "windows")]
-pub use windows::{mount_points, Error};
+use windows as sys;
 
+#[derive(Debug, Clone)]
+pub struct MountInfo {
+    /// Mount path
+    pub path: String,
+    /// Available bytes to current user
+    pub avail: Option<u64>,
+    /// Free bytes
+    pub free: Option<u64>,
+    /// Size in bytes
+    pub size: Option<u64>,
+    /// Name
+    pub name: Option<String>,
+    /// Format (NTFS, FAT, ext4, ...)
+    pub format: Option<String>,
+    /// Read only
+    pub readonly: Option<bool>,
+    /// True if this mount point is likely to not be important
+    pub dummy: bool,
+    __priv: (),
+}
+
+pub use sys::{mountinfos, mountpaths, Error};
 impl std::error::Error for Error {}
 
 #[cfg(test)]
@@ -19,9 +41,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        for mount_point in mount_points().unwrap() {
-            eprintln!("{}", mount_point.display());
+    fn mountpaths_works() {
+        for mountpath in mountpaths().unwrap() {
+            eprintln!("{}", mountpath);
+        }
+    }
+    #[test]
+    fn mountinfosworks() {
+        for mountinfo in mountinfos().unwrap() {
+            eprintln!("{:?}", mountinfo);
         }
     }
 }

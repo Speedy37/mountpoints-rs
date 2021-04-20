@@ -1,7 +1,7 @@
+use crate::MountInfo;
 use std::ffi::CStr;
 use std::fmt;
 use std::os::raw::{c_char, c_int};
-use std::path::PathBuf;
 
 #[allow(non_camel_case_types)]
 type uid_t = u32;
@@ -14,6 +14,7 @@ struct fsid_t {
 const MFSTYPENAMELEN: usize = 16;
 const MAXPATHLEN: usize = 1024;
 const MNT_NOWAIT: c_int = 2;
+const MNT_RDONLY: u32 = 1;
 
 #[repr(C)]
 struct statfs64 {
@@ -70,21 +71,53 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn mount_points() -> Result<Vec<PathBuf>, Error> {
+fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result<(), Error> {
     let mut mntbuf: *const statfs64 = std::ptr::null_mut();
     let mut n = unsafe { getmntinfo64(&mut mntbuf, MNT_NOWAIT) };
     if n <= 0 {
         return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
     }
 
-    let mut mount_points = Vec::with_capacity(n as usize);
     while n > 0 {
         let p: &statfs64 = unsafe { &*mntbuf };
-        let mount_point = unsafe { CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char) };
-        mount_points.push(mount_point.to_str().map_err(|_| Error::Utf8Error)?.into());
+        let mountpath = unsafe { CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char) };
+        cb(p, mountpath.to_str().map_err(|_| Error::Utf8Error)?.into())?;
         mntbuf = unsafe { mntbuf.add(1) };
         n -= 1;
     }
 
-    Ok(mount_points)
+    Ok(())
+}
+
+pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
+    let mut mountinfos = Vec::new();
+    _mounts(|stat, path| {
+        mountinfos.push(MountInfo {
+            path,
+            avail: Some(stat.f_bavail.saturating_mul(u64::from(stat.f_bsize))),
+            free: Some(stat.f_bfree.saturating_mul(u64::from(stat.f_bsize))),
+            size: Some(stat.f_blocks.saturating_mul(u64::from(stat.f_bsize))),
+            name: None,
+            format: Some(
+                unsafe { CStr::from_ptr(stat.f_fstypename.as_ptr() as *const c_char) }
+                    .to_str()
+                    .map_err(|_| Error::Utf8Error)?
+                    .into(),
+            ),
+            readonly: Some((stat.f_flags & MNT_RDONLY) == MNT_RDONLY),
+            dummy: false,
+            __priv: (),
+        });
+        Ok(())
+    })?;
+    Ok(mountinfos)
+}
+
+pub fn mountpaths() -> Result<Vec<String>, Error> {
+    let mut mountpaths = Vec::new();
+    _mounts(|_, mountpath| {
+        mountpaths.push(mountpath);
+        Ok(())
+    })?;
+    Ok(mountpaths)
 }
