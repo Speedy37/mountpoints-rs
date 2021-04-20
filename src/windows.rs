@@ -1,6 +1,6 @@
 use crate::MountInfo;
 use std::fmt;
-use winapi::shared::winerror::{ERROR_MORE_DATA, ERROR_NO_MORE_FILES};
+use winapi::shared::winerror;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::fileapi::GetDiskFreeSpaceExW;
 use winapi::um::fileapi::GetVolumePathNamesForVolumeNameW;
@@ -13,7 +13,6 @@ pub enum Error {
     Utf16Error,
     VolumeIterError(u32),
     MountIterError(u32),
-    SizeError(u32),
 }
 
 impl fmt::Display for Error {
@@ -22,7 +21,6 @@ impl fmt::Display for Error {
             Error::Utf16Error => f.write_str("invalid utf16 path"),
             Error::VolumeIterError(code) => write!(f, "unable to get list of volumes: {}", code),
             Error::MountIterError(code) => write!(f, "unable to get list of mounts: {}", code),
-            Error::SizeError(code) => write!(f, "unable to get size of mounts: {}", code),
         }
     }
 }
@@ -47,7 +45,7 @@ fn _mounts(mut cb: impl FnMut(&[u16], String) -> Result<(), Error>) -> Result<()
             )
         };
         let mut slice = &names[..];
-        if ok == 0 && unsafe { GetLastError() } == ERROR_MORE_DATA {
+        if ok == 0 && unsafe { GetLastError() } == winerror::ERROR_MORE_DATA {
             names_vec = vec![0u16; len as usize];
             ok = unsafe {
                 GetVolumePathNamesForVolumeNameW(
@@ -71,7 +69,7 @@ fn _mounts(mut cb: impl FnMut(&[u16], String) -> Result<(), Error>) -> Result<()
         let more = unsafe { FindNextVolumeW(handle, name.as_mut_ptr(), name.len() as u32) };
         if more == 0 {
             let err = unsafe { GetLastError() };
-            if err == ERROR_NO_MORE_FILES {
+            if err == winerror::ERROR_NO_MORE_FILES {
                 break;
             } else {
                 return Err(Error::VolumeIterError(err));
@@ -101,15 +99,22 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
             )
         };
         if ok == 0 {
-            return Err(Error::SizeError(unsafe { GetLastError() }));
+            mountinfos.push(MountInfo {
+                path,
+                avail: 0,
+                free: 0,
+                size: 0,
+                __priv: (),
+            });
+        } else {
+            mountinfos.push(MountInfo {
+                path,
+                avail: unsafe { *lpFreeBytesAvailableToCaller.QuadPart() },
+                free: unsafe { *lpTotalNumberOfFreeBytes.QuadPart() },
+                size: unsafe { *lpTotalNumberOfBytes.QuadPart() },
+                __priv: (),
+            });
         }
-        mountinfos.push(MountInfo {
-            path,
-            avail: unsafe { *lpFreeBytesAvailableToCaller.QuadPart() },
-            free: unsafe { *lpTotalNumberOfFreeBytes.QuadPart() },
-            size: unsafe { *lpTotalNumberOfBytes.QuadPart() },
-            __priv: (),
-        });
         Ok(())
     })?;
     Ok(mountinfos)
