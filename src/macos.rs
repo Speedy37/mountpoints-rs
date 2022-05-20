@@ -52,7 +52,8 @@ struct statfs64 {
     f_reserved: [u32; 8],
 }
 
-extern "C" {
+extern "C" {    
+    #[link_name = "\u{1}_getmntinfo_r_np$INODE64"]
     fn getmntinfo_r_np(mntbufp: *mut *const statfs64, flags: c_int) -> c_int;
 }
 
