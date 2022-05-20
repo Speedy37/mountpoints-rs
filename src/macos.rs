@@ -53,7 +53,7 @@ struct statfs64 {
 }
 
 extern "C" {
-    fn getmntinfo64(mntbufp: *mut *const statfs64, flags: c_int) -> c_int;
+    fn getmntinfo_r_np(mntbufp: *mut *const statfs64, flags: c_int) -> c_int;
 }
 
 #[derive(Debug)]
@@ -73,7 +73,7 @@ impl fmt::Display for Error {
 
 fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result<(), Error> {
     let mut mntbuf: *const statfs64 = std::ptr::null_mut();
-    let mut n = unsafe { getmntinfo64(&mut mntbuf, MNT_NOWAIT) };
+    let mut n = unsafe { getmntinfo_r_np(&mut mntbuf, MNT_NOWAIT) };
     if n <= 0 {
         return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
     }
