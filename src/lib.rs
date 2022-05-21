@@ -64,7 +64,6 @@ mod tests {
             assert!(i.size.unwrap_or_default() > 1024 * 1024); // > 1Mb
             assert!(i.avail.unwrap_or_default() < i.size.unwrap_or_default());
             assert!(i.free.unwrap_or_default() < i.size.unwrap_or_default());
-            assert!(i.readonly == Some(false));
             true
         } else {
             false
