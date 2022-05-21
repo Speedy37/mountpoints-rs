@@ -83,7 +83,7 @@ fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result
             mntbuf.truncate(n as usize);
         }
     }
-    if n <= 0 {
+    if n < 0 {
         return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
     }
     for p in &mntbuf {
