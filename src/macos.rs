@@ -74,9 +74,11 @@ impl fmt::Display for Error {
 fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result<(), Error> {
     let mut n: i32 = unsafe { getfsstat64(std::ptr::null_mut(), 0, MNT_NOWAIT) };
     let mut mntbuf = Vec::<statfs64>::new();
+    dbg!("_mounts getfsstat64a", n);
     if n > 0 {
         mntbuf.resize_with(n as usize, || unsafe { std::mem::zeroed() });
         n = unsafe { getfsstat64(mntbuf.as_mut_ptr(), mntbuf.len() as c_int, MNT_NOWAIT) };
+        dbg!("_mounts getfsstat64b", n);
         if n >= 0 {
             mntbuf.truncate(n as usize);
         }
