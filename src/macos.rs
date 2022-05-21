@@ -52,9 +52,8 @@ struct statfs64 {
     f_reserved: [u32; 8],
 }
 
-extern "C" {    
-    #[link_name = "\u{1}_getmntinfo_r_np$INODE64"]
-    fn getmntinfo_r_np(mntbufp: *mut *const statfs64, flags: c_int) -> c_int;
+extern "C" {
+    fn getfsstat64(buf: *mut statfs64, bufsize: c_int, flags: c_int) -> c_int;
 }
 
 #[derive(Debug)]
@@ -73,20 +72,22 @@ impl fmt::Display for Error {
 }
 
 fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result<(), Error> {
-    let mut mntbuf: *const statfs64 = std::ptr::null_mut();
-    let mut n = unsafe { getmntinfo_r_np(&mut mntbuf, MNT_NOWAIT) };
-    if n <= 0 {
+    let mut n: i32 = unsafe { getfsstat64(std::ptr::null_mut(), 0, MNT_NOWAIT) };
+    let mut mntbuf = Vec::<statfs64>::new();
+    if n > 0 {
+        mntbuf.resize_with(n as usize, || unsafe { std::mem::zeroed() });
+        n = unsafe { getfsstat64(mntbuf.as_mut_ptr(), mntbuf.len() as c_int, MNT_NOWAIT) };
+        if n >= 0 {
+            mntbuf.truncate(n as usize);
+        }
+    }
+    if n < 0 {
         return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
     }
-
-    while n > 0 {
-        let p: &statfs64 = unsafe { &*mntbuf };
+    for p in &mntbuf {
         let mountpath = unsafe { CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char) };
         cb(p, mountpath.to_str().map_err(|_| Error::Utf8Error)?.into())?;
-        mntbuf = unsafe { mntbuf.add(1) };
-        n -= 1;
     }
-
     Ok(())
 }
 
