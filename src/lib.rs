@@ -40,17 +40,36 @@ impl std::error::Error for Error {}
 mod tests {
     use super::*;
 
+    const ROOT: &str = if cfg!(target_os = "windows") {
+        "C:\\"
+    } else {
+        "/"
+    };
+
     #[test]
     fn mountpaths_works() {
-        assert!(mountpaths().unwrap().len() > 0);
-        for mountpath in mountpaths().unwrap() {
+        let paths = mountpaths().unwrap();
+        assert!(paths.len() > 0);
+        assert!(paths.iter().any(|p| p.as_str() == ROOT));
+
+        for mountpath in &paths {
             eprintln!("{}", mountpath);
         }
     }
     #[test]
     fn mountinfosworks() {
-        assert!(mountinfos().unwrap().len() > 0);
-        for mountinfo in mountinfos().unwrap() {
+        let infos = mountinfos().unwrap();
+        assert!(infos.len() > 0);
+        assert!(infos.iter().any(|i| if i.path.as_str() == ROOT {
+            assert!(i.size.unwrap_or_default() > 1024 * 1024); // > 1Mb
+            assert!(i.avail.unwrap_or_default() < i.size.unwrap_or_default());
+            assert!(i.free.unwrap_or_default() < i.size.unwrap_or_default());
+            assert!(i.readonly == Some(false));
+            true
+        } else {
+            false
+        }));
+        for mountinfo in &infos {
             eprintln!("{:?}", mountinfo);
         }
     }
