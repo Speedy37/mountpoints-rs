@@ -53,7 +53,8 @@ struct statfs64 {
 }
 
 extern "C" {
-    fn getfsstat64(buf: *mut statfs64, bufsize: c_int, flags: c_int) -> c_int;
+    #[link_name = "\u{1}_getfsstat$INODE64"]
+    fn getfsstat(buf: *mut statfs64, bufsize: c_int, flags: c_int) -> c_int;
 }
 
 #[derive(Debug)]
@@ -72,12 +73,12 @@ impl fmt::Display for Error {
 }
 
 fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result<(), Error> {
-    let mut n: i32 = unsafe { getfsstat64(std::ptr::null_mut(), 0, MNT_NOWAIT) };
+    let mut n: i32 = unsafe { getfsstat(std::ptr::null_mut(), 0, MNT_NOWAIT) };
     let mut mntbuf = Vec::<statfs64>::new();
     if n > 0 {
         mntbuf.resize_with(n as usize, || unsafe { std::mem::zeroed() });
         let bufsize = mntbuf.len() * std::mem::size_of::<statfs64>();
-        n = unsafe { getfsstat64(mntbuf.as_mut_ptr(), bufsize as c_int, MNT_NOWAIT) };
+        n = unsafe { getfsstat(mntbuf.as_mut_ptr(), bufsize as c_int, MNT_NOWAIT) };
         if n >= 0 {
             mntbuf.truncate(n as usize);
         }
