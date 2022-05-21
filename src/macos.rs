@@ -78,12 +78,12 @@ fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result
     if n > 0 {
         mntbuf.resize_with(n as usize, || unsafe { std::mem::zeroed() });
         n = unsafe { getfsstat64(mntbuf.as_mut_ptr(), mntbuf.len() as c_int, MNT_NOWAIT) };
-        dbg!("_mounts getfsstat64b", n);
+        dbg!("_mounts getfsstat64b", n, mntbuf.len());
         if n >= 0 {
             mntbuf.truncate(n as usize);
         }
     }
-    if n < 0 {
+    if n <= 0 {
         return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
     }
     for p in &mntbuf {
