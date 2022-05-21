@@ -1,6 +1,5 @@
 #[cfg(target_os = "linux")]
 mod linux;
-#[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
@@ -42,12 +41,14 @@ mod tests {
 
     #[test]
     fn mountpaths_works() {
+        assert!(mountpaths().unwrap().len() > 0);
         for mountpath in mountpaths().unwrap() {
             eprintln!("{}", mountpath);
         }
     }
     #[test]
     fn mountinfosworks() {
+        assert!(mountinfos().unwrap().len() > 0);
         for mountinfo in mountinfos().unwrap() {
             eprintln!("{:?}", mountinfo);
         }
