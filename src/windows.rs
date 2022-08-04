@@ -1,5 +1,8 @@
 use crate::MountInfo;
+use std::ffi::OsString;
 use std::fmt;
+use std::os::windows::prelude::OsStringExt;
+use std::path::PathBuf;
 use winapi::shared::winerror;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::fileapi::GetVolumePathNamesForVolumeNameW;
@@ -27,7 +30,7 @@ impl fmt::Display for Error {
     }
 }
 
-fn _mounts(mut cb: impl FnMut(&[u16], String) -> Result<(), Error>) -> Result<(), Error> {
+fn _mounts(mut cb: impl FnMut(&[u16], PathBuf) -> Result<(), Error>) -> Result<(), Error> {
     let mut name = [0u16; MAX_PATH];
     let handle = unsafe { FindFirstVolumeW(name.as_mut_ptr(), name.len() as u32) };
     if handle == INVALID_HANDLE_VALUE {
@@ -63,7 +66,7 @@ fn _mounts(mut cb: impl FnMut(&[u16], String) -> Result<(), Error>) -> Result<()
         }
 
         for mountpathw in slice.split(|&c| c == 0).take_while(|s| !s.is_empty()) {
-            let mountpath = String::from_utf16(mountpathw).map_err(|_| Error::Utf16Error)?;
+            let mountpath = PathBuf::from(OsString::from_wide(mountpathw));
             cb(mountpathw, mountpath)?;
         }
 
@@ -155,7 +158,7 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
     Ok(mountinfos)
 }
 
-pub fn mountpaths() -> Result<Vec<String>, Error> {
+pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
     let mut mountpaths = Vec::new();
     _mounts(|_, path| {
         mountpaths.push(path);

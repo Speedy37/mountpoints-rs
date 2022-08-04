@@ -1,7 +1,9 @@
 use crate::MountInfo;
-use std::ffi::CStr;
+use std::ffi::{CStr, OsStr};
 use std::fmt;
 use std::os::raw::{c_char, c_int};
+use std::os::unix::ffi::OsStrExt;
+use std::path::PathBuf;
 
 #[allow(non_camel_case_types)]
 type uid_t = u32;
@@ -72,7 +74,7 @@ impl fmt::Display for Error {
     }
 }
 
-fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result<(), Error> {
+fn _mounts(mut cb: impl FnMut(&statfs64, PathBuf) -> Result<(), Error>) -> Result<(), Error> {
     let mut n: i32 = unsafe { getfsstat(std::ptr::null_mut(), 0, MNT_NOWAIT) };
     let mut mntbuf = Vec::<statfs64>::new();
     if n > 0 {
@@ -87,8 +89,10 @@ fn _mounts(mut cb: impl FnMut(&statfs64, String) -> Result<(), Error>) -> Result
         return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
     }
     for p in &mntbuf {
-        let mountpath = unsafe { CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char) };
-        cb(p, mountpath.to_str().map_err(|_| Error::Utf8Error)?.into())?;
+        let mountpath = OsStr::from_bytes(unsafe {
+            CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char).to_bytes()
+        });
+        cb(p, PathBuf::from(mountpath))?;
     }
     Ok(())
 }
@@ -117,7 +121,7 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
     Ok(mountinfos)
 }
 
-pub fn mountpaths() -> Result<Vec<String>, Error> {
+pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
     let mut mountpaths = Vec::new();
     _mounts(|_, mountpath| {
         mountpaths.push(mountpath);
