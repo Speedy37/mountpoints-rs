@@ -7,7 +7,7 @@ use mountpoints::mountpaths;
 
 fn main() {
     for mountpath in mountpaths().unwrap() {
-        println!("{}", mountpath);
+        println!("{}", mountpath.display());
     }
 }
 ```
