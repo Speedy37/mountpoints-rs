@@ -5,6 +5,8 @@ mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 
+use std::path::PathBuf;
+
 #[cfg(target_os = "linux")]
 use linux as sys;
 #[cfg(target_os = "macos")]
@@ -15,7 +17,7 @@ use windows as sys;
 #[derive(Debug, Clone)]
 pub struct MountInfo {
     /// Mount path
-    pub path: String,
+    pub path: PathBuf,
     /// Available bytes to current user
     pub avail: Option<u64>,
     /// Free bytes
@@ -38,29 +40,33 @@ impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
 
-    const ROOT: &str = if cfg!(target_os = "windows") {
-        "C:\\"
-    } else {
-        "/"
-    };
+    fn root() -> &'static Path {
+        if cfg!(target_os = "windows") {
+            Path::new("C:\\")
+        } else {
+            Path::new("/")
+        }
+    }
 
     #[test]
     fn mountpaths_works() {
         let paths = mountpaths().unwrap();
         assert!(paths.len() > 0);
-        assert!(paths.iter().any(|p| p.as_str() == ROOT));
+        assert!(paths.iter().any(|p| p == root()));
 
         for mountpath in &paths {
-            eprintln!("{}", mountpath);
+            eprintln!("{:?}", mountpath);
         }
     }
     #[test]
     fn mountinfosworks() {
         let infos = mountinfos().unwrap();
         assert!(infos.len() > 0);
-        assert!(infos.iter().any(|i| if i.path.as_str() == ROOT {
+        assert!(infos.iter().any(|i| if i.path == root() {
             assert!(i.size.unwrap_or_default() > 1024 * 1024); // > 1Mb
             assert!(i.avail.unwrap_or_default() < i.size.unwrap_or_default());
             assert!(i.free.unwrap_or_default() < i.size.unwrap_or_default());
