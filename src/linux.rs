@@ -12,6 +12,7 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub enum Error {
     IoError(std::io::Error),
+    #[deprecated(note = "Not produced anymore")]
     StatError(c_int),
     NulError,
 }
@@ -20,6 +21,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::IoError(err) => write!(f, "failed to read /proc/mounts: {}", err),
+            #[allow(deprecated)]
             Error::StatError(err) => write!(f, "statvfs failed: {}", err),
             Error::NulError => write!(f, "mount path contains NUL"),
         }
@@ -58,18 +60,19 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
         cpath.push(0);
         let mut stat = MaybeUninit::<libc::statvfs>::zeroed();
         let r = unsafe { libc::statvfs(cpath.as_ptr() as *const c_char, stat.as_mut_ptr()) };
-        if r != 0 {
-            return Err(Error::StatError(unsafe { *libc::__errno_location() }));
-        }
-        let stat = unsafe { stat.assume_init() };
+        let stat = if r == 0 {
+            Some(unsafe { stat.assume_init() })
+        } else {
+            None
+        };
         mountinfos.push(MountInfo {
             path,
-            avail: Some(stat.f_bavail.saturating_mul(u64::from(stat.f_bsize))),
-            free: Some(stat.f_bfree.saturating_mul(u64::from(stat.f_bsize))),
-            size: Some(stat.f_blocks.saturating_mul(u64::from(stat.f_frsize))),
+            avail: stat.map(|stat| stat.f_bavail.saturating_mul(u64::from(stat.f_bsize))),
+            free: stat.map(|stat| stat.f_bfree.saturating_mul(u64::from(stat.f_bsize))),
+            size: stat.map(|stat| stat.f_blocks.saturating_mul(u64::from(stat.f_frsize))),
             name: None,
             format: fstype.map(|s| s.to_string()),
-            readonly: Some((stat.f_flag & libc::ST_RDONLY) == libc::ST_RDONLY),
+            readonly: stat.map(|stat| (stat.f_flag & libc::ST_RDONLY) == libc::ST_RDONLY),
             dummy,
             __priv: (),
         });
