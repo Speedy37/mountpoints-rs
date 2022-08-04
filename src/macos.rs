@@ -69,7 +69,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::GetMntInfo64(err) => write!(f, "getmntinfo64 failed: {}", err),
-            Error::Utf8Error => write!(f, "invalid utf8 path"),
+            Error::Utf8Error => write!(f, "invalid utf8 format"),
         }
     }
 }
@@ -89,9 +89,9 @@ fn _mounts(mut cb: impl FnMut(&statfs64, PathBuf) -> Result<(), Error>) -> Resul
         return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
     }
     for p in &mntbuf {
-        let mountpath = OsStr::from_bytes(unsafe {
-            CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char).to_bytes()
-        });
+        let mountpath = OsStr::from_bytes(
+            unsafe { CStr::from_ptr(p.f_mntonname.as_ptr() as *const c_char) }.to_bytes(),
+        );
         cb(p, PathBuf::from(mountpath))?;
     }
     Ok(())
