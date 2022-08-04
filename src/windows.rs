@@ -31,14 +31,15 @@ impl fmt::Display for Error {
 }
 
 fn _mounts(mut cb: impl FnMut(&[u16], PathBuf) -> Result<(), Error>) -> Result<(), Error> {
+    let mut ret = Ok(());
     let mut name = [0u16; MAX_PATH];
+    let mut names_vec = Vec::<u16>::new();
     let handle = unsafe { FindFirstVolumeW(name.as_mut_ptr(), name.len() as u32) };
     if handle == INVALID_HANDLE_VALUE {
         return Err(Error::VolumeIterError(unsafe { GetLastError() }));
     }
     loop {
-        let mut names_vec;
-        let mut names = [0u16; 1];
+        let mut names = [0u16; MAX_PATH];
         let mut len = names.len() as u32;
         let mut ok = unsafe {
             GetVolumePathNamesForVolumeNameW(
@@ -50,7 +51,8 @@ fn _mounts(mut cb: impl FnMut(&[u16], PathBuf) -> Result<(), Error>) -> Result<(
         };
         let mut slice = &names[..];
         if ok == 0 && unsafe { GetLastError() } == winerror::ERROR_MORE_DATA {
-            names_vec = vec![0u16; len as usize];
+            names_vec.clear();
+            names_vec.resize(len as usize, 0);
             ok = unsafe {
                 GetVolumePathNamesForVolumeNameW(
                     name.as_ptr(),
@@ -62,29 +64,30 @@ fn _mounts(mut cb: impl FnMut(&[u16], PathBuf) -> Result<(), Error>) -> Result<(
             slice = names_vec.as_slice();
         }
         if ok == 0 {
-            return Err(Error::MountIterError(unsafe { GetLastError() }));
-        }
-
-        for mountpathw in slice.split(|&c| c == 0).take_while(|s| !s.is_empty()) {
-            let mountpath = PathBuf::from(OsString::from_wide(mountpathw));
-            cb(mountpathw, mountpath)?;
+            let err = unsafe { GetLastError() };
+            if err != winerror::ERROR_FILE_NOT_FOUND {
+                ret = Err(Error::MountIterError(err));
+                break;
+            }
+        } else {
+            for mountpathw in slice.split(|&c| c == 0).take_while(|s| !s.is_empty()) {
+                let mountpath = PathBuf::from(OsString::from_wide(mountpathw));
+                cb(mountpathw, mountpath)?;
+            }
         }
 
         let more = unsafe { FindNextVolumeW(handle, name.as_mut_ptr(), name.len() as u32) };
         if more == 0 {
             let err = unsafe { GetLastError() };
-            if err == winerror::ERROR_NO_MORE_FILES {
-                break;
-            } else {
-                return Err(Error::VolumeIterError(err));
+            if err != winerror::ERROR_NO_MORE_FILES {
+                ret = Err(Error::VolumeIterError(err));
             }
+            break;
         }
     }
-    if unsafe { FindVolumeClose(handle) } == 0 {
-        return Err(Error::VolumeIterError(unsafe { GetLastError() }));
-    }
+    unsafe { FindVolumeClose(handle) };
 
-    Ok(())
+    ret
 }
 
 #[allow(non_snake_case)]
