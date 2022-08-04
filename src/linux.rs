@@ -1,10 +1,10 @@
 use crate::MountInfo;
+use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::mem::MaybeUninit;
 use std::os::raw::c_char;
-use std::os::raw::c_int;
 use std::os::unix::prelude::OsStrExt;
 use std::os::unix::prelude::OsStringExt;
 use std::path::PathBuf;
@@ -12,18 +12,14 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub enum Error {
     IoError(std::io::Error),
-    #[deprecated(note = "Not produced anymore")]
-    StatError(c_int),
-    NulError,
+    PathParseError,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::IoError(err) => write!(f, "failed to read /proc/mounts: {}", err),
-            #[allow(deprecated)]
-            Error::StatError(err) => write!(f, "statvfs failed: {}", err),
-            Error::NulError => write!(f, "mount path contains NUL"),
+            Error::PathParseError => write!(f, "failed to parse path"),
         }
     }
 }
@@ -33,21 +29,25 @@ fn _mounts(
 ) -> Result<(), Error> {
     let mounts = fs::read("/proc/mounts").map_err(|err| Error::IoError(err))?;
     for mount in mounts.split(|b| *b == b'\n') {
+        // Each filesystem is described on a separate line. Fields on each
+        // line are separated by tabs or spaces. Lines starting with '#' are
+        // comments. Blank lines are ignored.
         if mount.starts_with(b"#") {
             continue;
         }
-        let mut it = mount.split(|b| *b == b' ' || *b == b'\t');
-        let _fsname = it.next();
+        let mut it = mount
+            .split(|b| *b == b' ' || *b == b'\t')
+            .skip(1 /*fs_spec*/);
         if let Some(mountpath) = it.next() {
-            let fstype = it.next().and_then(|mp| std::str::from_utf8(mp).ok());
-            let dummy = match fstype.unwrap_or("") {
+            let fs_vfstype = it.next().and_then(|mp| std::str::from_utf8(mp).ok());
+            let dummy = match fs_vfstype.unwrap_or("") {
                 "autofs" | "proc" | "subfs" | "debugfs" | "devpts" | "fusectl" | "mqueue"
                 | "rpc_pipefs" | "sysfs" | "devfs" | "kernfs" | "ignore" | "configfs"
                 | "binfmt_misc" | "bpf" | "pstore" | "cgroup" | "cgroup2" | "securityfs"
                 | "efivarfs" => true,
                 _ => false,
             };
-            cb(PathBuf::from(unescape_path(mountpath)), dummy, fstype)?;
+            cb(unescape_path(mountpath)?.into(), dummy, fs_vfstype)?;
         }
     }
     Ok(())
@@ -90,21 +90,58 @@ pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
     Ok(mountpaths)
 }
 
-fn unescape_path(path: &[u8]) -> OsString {
-    let mut out = vec![];
-    let mut i = 0;
-    loop {
-        if let Some((bs_i, _)) = path.iter().enumerate().skip(i).find(|(_, b)| **b == b'\\') {
-            out.extend_from_slice(&path[i..bs_i]);
-            let escape =
-                u8::from_str_radix(std::str::from_utf8(&path[bs_i + 1..bs_i + 4]).unwrap(), 8)
-                    .unwrap();
-            out.push(escape);
-            i = bs_i + 4;
-        } else {
-            out.extend_from_slice(&path[i..]);
-            break;
+/// unescape octal trigrams from path (ie. `\040` => ` `)
+fn unescape_path(path: &[u8]) -> Result<OsString, Error> {
+    let mut it = path.split(|b| *b == b'\\');
+    if let (Some(left), Some(mut part)) = (it.next(), it.next()) {
+        let mut vec = Vec::<u8>::new();
+        vec.extend_from_slice(left);
+        loop {
+            if part.len() < 3 {
+                return Err(Error::PathParseError);
+            }
+            let escaped = part
+                .iter()
+                .take(3)
+                .try_fold(0u8, |acc, digit| match digit {
+                    b'0'..=b'7' if acc < 0o40 => Ok(acc * 8 + (digit - b'0')),
+                    _ => Err(Error::PathParseError),
+                })?;
+            vec.push(escaped);
+            vec.extend_from_slice(&part[3..]);
+            match it.next() {
+                None => break,
+                Some(p) => part = p,
+            }
         }
+        Ok(OsString::from_vec(vec))
+    } else {
+        Ok(OsStr::from_bytes(path).into())
     }
-    OsString::from_vec(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unescape_path_works() {
+        assert_eq!(unescape_path(b"").unwrap(), "");
+        assert_eq!(
+            unescape_path(b"/tmp/a\\134\\054b\\134\\134c/lower").unwrap(),
+            "/tmp/a\\,b\\\\c/lower"
+        );
+        assert!(matches!(
+            unescape_path(b"\\54ab").unwrap_err(),
+            Error::PathParseError
+        ));
+        assert!(matches!(
+            unescape_path(b"\\666").unwrap_err(),
+            Error::PathParseError
+        ));
+        assert_eq!(
+            unescape_path(b"\\000\\377").unwrap(),
+            OsStr::from_bytes(b"\x00\xFF")
+        );
+    }
 }
