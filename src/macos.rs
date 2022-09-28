@@ -55,7 +55,10 @@ struct statfs64 {
 }
 
 extern "C" {
-    #[link_name = "\u{1}_getfsstat$INODE64"]
+    #[cfg_attr(
+        all(target_os = "macos", not(target_arch = "aarch64")),
+        link_name = "getfsstat$INODE64"
+    )]
     fn getfsstat(buf: *mut statfs64, bufsize: c_int, flags: c_int) -> c_int;
 }
 
