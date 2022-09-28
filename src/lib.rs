@@ -87,6 +87,7 @@ pub struct MountInfo {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     WindowsUtf16Error,
     WindowsVolumeIterError(u32),
