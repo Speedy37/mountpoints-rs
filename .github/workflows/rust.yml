@@ -22,3 +22,6 @@ jobs:
         run: cargo build --verbose
       - name: Run tests
         run: cargo test --verbose -- --nocapture
+      - name: Build AArch64
+        if: matrix.os == 'macos-latest'
+        run: rustup target install aarch64-apple-darwin && cargo build --tests --verbose --target=aarch64-apple-darwin
