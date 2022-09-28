@@ -1,6 +1,5 @@
-use crate::MountInfo;
+use crate::{Error, MountInfo};
 use std::ffi::OsString;
-use std::fmt;
 use std::os::windows::prelude::OsStringExt;
 use std::path::PathBuf;
 use winapi::shared::winerror;
@@ -13,30 +12,13 @@ use winapi::um::winnt::{FILE_READ_ONLY_VOLUME, ULARGE_INTEGER};
 
 const MAX_PATH: usize = 32768;
 
-#[derive(Debug)]
-pub enum Error {
-    Utf16Error,
-    VolumeIterError(u32),
-    MountIterError(u32),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Utf16Error => f.write_str("invalid utf16 path"),
-            Error::VolumeIterError(code) => write!(f, "unable to get list of volumes: {}", code),
-            Error::MountIterError(code) => write!(f, "unable to get list of mounts: {}", code),
-        }
-    }
-}
-
 fn _mounts(mut cb: impl FnMut(&[u16], PathBuf) -> Result<(), Error>) -> Result<(), Error> {
     let mut ret = Ok(());
     let mut name = [0u16; MAX_PATH];
     let mut names_vec = Vec::<u16>::new();
     let handle = unsafe { FindFirstVolumeW(name.as_mut_ptr(), name.len() as u32) };
     if handle == INVALID_HANDLE_VALUE {
-        return Err(Error::VolumeIterError(unsafe { GetLastError() }));
+        return Err(Error::WindowsVolumeIterError(unsafe { GetLastError() }));
     }
     loop {
         let mut names = [0u16; MAX_PATH];
@@ -66,7 +48,7 @@ fn _mounts(mut cb: impl FnMut(&[u16], PathBuf) -> Result<(), Error>) -> Result<(
         if ok == 0 {
             let err = unsafe { GetLastError() };
             if err != winerror::ERROR_FILE_NOT_FOUND {
-                ret = Err(Error::MountIterError(err));
+                ret = Err(Error::WindowsMountIterError(err));
                 break;
             }
         } else {
@@ -80,7 +62,7 @@ fn _mounts(mut cb: impl FnMut(&[u16], PathBuf) -> Result<(), Error>) -> Result<(
         if more == 0 {
             let err = unsafe { GetLastError() };
             if err != winerror::ERROR_NO_MORE_FILES {
-                ret = Err(Error::VolumeIterError(err));
+                ret = Err(Error::WindowsVolumeIterError(err));
             }
             break;
         }
@@ -145,10 +127,12 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
             };
             if ok != 0 {
                 if let Some(slice) = name.split(|&c| c == 0).next() {
-                    info.name = Some(String::from_utf16(slice).map_err(|_| Error::Utf16Error)?);
+                    info.name =
+                        Some(String::from_utf16(slice).map_err(|_| Error::WindowsUtf16Error)?);
                 }
                 if let Some(slice) = fsname.split(|&c| c == 0).next() {
-                    info.format = Some(String::from_utf16(slice).map_err(|_| Error::Utf16Error)?);
+                    info.format =
+                        Some(String::from_utf16(slice).map_err(|_| Error::WindowsUtf16Error)?);
                 }
                 info.readonly = Some((flags & FILE_READ_ONLY_VOLUME) == FILE_READ_ONLY_VOLUME);
                 info.dummy = false;

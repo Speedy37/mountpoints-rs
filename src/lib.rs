@@ -86,8 +86,41 @@ pub struct MountInfo {
     __priv: (),
 }
 
-pub use sys::{mountinfos, mountpaths, Error};
+#[derive(Debug)]
+pub enum Error {
+    WindowsUtf16Error,
+    WindowsVolumeIterError(u32),
+    WindowsMountIterError(u32),
+    LinuxIoError(std::io::Error),
+    LinuxPathParseError,
+    MacOsGetfsstatError(i32),
+    MacOsUtf8Error,
+}
 impl std::error::Error for Error {}
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::WindowsUtf16Error => f.write_str("invalid utf16 path"),
+            Error::WindowsVolumeIterError(code) => {
+                write!(f, "unable to get list of volumes: {}", code)
+            }
+            Error::WindowsMountIterError(code) => {
+                write!(f, "unable to get list of mounts: {}", code)
+            }
+            Error::LinuxIoError(err) => write!(f, "failed to read /proc/mounts: {}", err),
+            Error::LinuxPathParseError => write!(f, "failed to parse path"),
+            Error::MacOsGetfsstatError(err) => write!(f, "getfsstat failed: {}", err),
+            Error::MacOsUtf8Error => write!(f, "invalid utf8 format"),
+        }
+    }
+}
+
+pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
+    sys::mountinfos()
+}
+pub fn mountpaths() -> Result<Vec<PathBuf>, Error> {
+    sys::mountpaths()
+}
 
 #[cfg(test)]
 mod tests {

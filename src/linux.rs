@@ -1,7 +1,6 @@
-use crate::MountInfo;
+use crate::{Error, MountInfo};
 use std::ffi::OsStr;
 use std::ffi::OsString;
-use std::fmt;
 use std::fs;
 use std::mem::MaybeUninit;
 use std::os::raw::c_char;
@@ -9,25 +8,10 @@ use std::os::unix::prelude::OsStrExt;
 use std::os::unix::prelude::OsStringExt;
 use std::path::PathBuf;
 
-#[derive(Debug)]
-pub enum Error {
-    IoError(std::io::Error),
-    PathParseError,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::IoError(err) => write!(f, "failed to read /proc/mounts: {}", err),
-            Error::PathParseError => write!(f, "failed to parse path"),
-        }
-    }
-}
-
 fn _mounts(
     mut cb: impl FnMut(PathBuf, bool, Option<&str>) -> Result<(), Error>,
 ) -> Result<(), Error> {
-    let mounts = fs::read("/proc/mounts").map_err(|err| Error::IoError(err))?;
+    let mounts = fs::read("/proc/mounts").map_err(|err| Error::LinuxIoError(err))?;
     for mount in mounts.split(|b| *b == b'\n') {
         // Each filesystem is described on a separate line. Fields on each
         // line are separated by tabs or spaces. Lines starting with '#' are
@@ -98,14 +82,14 @@ fn unescape_path(path: &[u8]) -> Result<OsString, Error> {
         vec.extend_from_slice(left);
         loop {
             if part.len() < 3 {
-                return Err(Error::PathParseError);
+                return Err(Error::LinuxPathParseError);
             }
             let escaped = part
                 .iter()
                 .take(3)
                 .try_fold(0u8, |acc, digit| match digit {
                     b'0'..=b'7' if acc < 0o40 => Ok(acc * 8 + (digit - b'0')),
-                    _ => Err(Error::PathParseError),
+                    _ => Err(Error::LinuxPathParseError),
                 })?;
             vec.push(escaped);
             vec.extend_from_slice(&part[3..]);
@@ -133,11 +117,11 @@ mod tests {
         );
         assert!(matches!(
             unescape_path(b"\\54ab").unwrap_err(),
-            Error::PathParseError
+            Error::LinuxPathParseError
         ));
         assert!(matches!(
             unescape_path(b"\\666").unwrap_err(),
-            Error::PathParseError
+            Error::LinuxPathParseError
         ));
         assert_eq!(
             unescape_path(b"\\000\\377").unwrap(),

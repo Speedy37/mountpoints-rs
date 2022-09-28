@@ -1,26 +1,10 @@
-use crate::MountInfo;
+use crate::{Error, MountInfo};
 use std::ffi::{CStr, OsStr};
-use std::fmt;
 use std::os::raw::{c_char, c_int};
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 
 const MNT_RDONLY: u32 = libc::MNT_RDONLY as u32;
-
-#[derive(Debug)]
-pub enum Error {
-    GetMntInfo64(c_int),
-    Utf8Error,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::GetMntInfo64(err) => write!(f, "getmntinfo64 failed: {}", err),
-            Error::Utf8Error => write!(f, "invalid utf8 format"),
-        }
-    }
-}
 
 fn _mounts(mut cb: impl FnMut(&libc::statfs, PathBuf) -> Result<(), Error>) -> Result<(), Error> {
     let mut n: i32 = unsafe { libc::getfsstat(std::ptr::null_mut(), 0, libc::MNT_NOWAIT) };
@@ -34,7 +18,7 @@ fn _mounts(mut cb: impl FnMut(&libc::statfs, PathBuf) -> Result<(), Error>) -> R
         }
     }
     if n < 0 {
-        return Err(Error::GetMntInfo64(unsafe { *libc::__error() }));
+        return Err(Error::MacOsGetfsstatError(unsafe { *libc::__error() }));
     }
     for p in &mntbuf {
         let mountpath = OsStr::from_bytes(
@@ -57,7 +41,7 @@ pub fn mountinfos() -> Result<Vec<MountInfo>, Error> {
             format: Some(
                 unsafe { CStr::from_ptr(stat.f_fstypename.as_ptr() as *const c_char) }
                     .to_str()
-                    .map_err(|_| Error::Utf8Error)?
+                    .map_err(|_| Error::MacOsUtf8Error)?
                     .into(),
             ),
             readonly: Some((stat.f_flags & MNT_RDONLY) == MNT_RDONLY),
